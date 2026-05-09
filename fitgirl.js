@@ -40,7 +40,8 @@ module.exports = {
       page_number === 1
         ? `${BASE_URL}/?s=${formattedQuery}`
         : `${BASE_URL}/page/${page_number}/?s=${formattedQuery}`;
-    return this._scrapeWordPressLoop(url, onGameFound);
+
+    return this._scrapeSearchLoop(url, onGameFound);
   },
 
   async get_games_by_category(category, page_number = 1, onGameFound) {
@@ -48,7 +49,6 @@ module.exports = {
       onGameFound = page_number;
       page_number = 1;
     }
-
     const catMap = {
       "Top 50 Repacks": `${BASE_URL}/pop-repacks/`,
       "Top 150 Repacks": `${BASE_URL}/popular-repacks-of-the-year/`,
@@ -65,6 +65,7 @@ module.exports = {
   },
 
   async _scrapeWordPressLoop(url, onGameFound) {
+    // Fast scrape for Homepage
     try {
       const { data } = await axios.get(url);
       const $ = cheerio.load(data);
@@ -74,8 +75,9 @@ module.exports = {
         const titleTag = $(post).find("h1.entry-title a");
         if (!titleTag.length) return;
 
-        const rawName = titleTag.text().trim();
-        const cleanName = rawName
+        const cleanName = titleTag
+          .text()
+          .trim()
           .replace(/FitGirl/i, "")
           .replace(/Repack/i, "")
           .split(/ – | - | \+|,\s|\//)[0]
@@ -99,7 +101,6 @@ module.exports = {
           .each((_, tag) => {
             categories.push($(tag).text().trim().toLowerCase());
           });
-
         categories = categories.filter((c) => c && c.trim() !== "");
 
         const html = $(post).find(".entry-content").html() || "";
@@ -140,26 +141,79 @@ module.exports = {
     }
   },
 
+  async _scrapeSearchLoop(url, onGameFound) {
+    try {
+      const { data } = await axios.get(url);
+      const $ = cheerio.load(data);
+      const links = [];
+
+      $("article.post").each((_, post) => {
+        const titleTag = $(post).find("h1.entry-title a");
+        if (!titleTag.length) return;
+
+        const rawName = titleTag.text().trim();
+        if (
+          rawName.toLowerCase().includes("upcoming repacks") ||
+          rawName.toLowerCase().includes("updates digest")
+        )
+          return;
+
+        const link = titleTag.attr("href");
+        if (link) links.push(link);
+      });
+
+      const uniqueLinks = [...new Set(links)];
+      const results = [];
+
+      for (let i = 0; i < uniqueLinks.length; i += 5) {
+        const batch = uniqueLinks.slice(i, i + 5);
+        const batchResults = await Promise.all(
+          batch.map(async (link) => {
+            const details = await this.get_game_details(link);
+            const gameObj = {
+              name: details.name || "Unknown",
+              thumbnail_link: details.thumbnail_link || "",
+              categories: details.categories || [],
+              size: details.size || "",
+              tag: details.tag || "",
+              url: link,
+              download_links: details.download_links || [],
+            };
+
+            if (typeof onGameFound === "function") onGameFound(gameObj);
+            return gameObj;
+          }),
+        );
+        results.push(...batchResults);
+      }
+      return results;
+    } catch (e) {
+      return [];
+    }
+  },
+
   async _scrapeListPage(url, onGameFound) {
     try {
       const { data } = await axios.get(url);
       const $ = cheerio.load(data);
       const links = [];
 
-      if ($("div.widget-grid-view-image").length > 0) {
-        $("div.widget-grid-view-image a").each((_, el) => {
-          const href = $(el).attr("href");
-          if (href) links.push(href);
+      if (url.includes("pop-repacks") || url.includes("popular-repacks")) {
+        $(".widget-grid-view-image a").each((_, el) => {
+          links.push($(el).attr("href"));
         });
-      } else if ($("ul#lcp_instance_0").length > 0) {
-        $("ul#lcp_instance_0 li a").each((_, el) => {
+      } else {
+        let targetList =
+          $("ul.lcp_catlist").length > 0
+            ? $("ul.lcp_catlist").first()
+            : $(".entry-content ul").first();
+        targetList.find("li a").each((_, el) => {
           const href = $(el).attr("href");
           if (
             href &&
             href.startsWith(BASE_URL) &&
             !href.includes("/category/") &&
-            !href.includes("/tag/") &&
-            !href.includes("#")
+            !href.includes("/tag/")
           ) {
             links.push(href);
           }
@@ -183,7 +237,6 @@ module.exports = {
               url: link,
               download_links: details.download_links || [],
             };
-
             if (typeof onGameFound === "function") onGameFound(gameObj);
             return gameObj;
           }),
