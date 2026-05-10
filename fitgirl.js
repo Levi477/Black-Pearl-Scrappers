@@ -53,9 +53,9 @@ module.exports = {
       "Top 50 Repacks": `${BASE_URL}/pop-repacks/`,
       "Top 150 Repacks": `${BASE_URL}/popular-repacks-of-the-year/`,
       "Pink Paw Award": `${BASE_URL}/games-with-my-personal-pink-paw-award/?lcp_page0=${page_number}#lcp_instance_0`,
-      "Hypervisor Bypass": `${BASE_URL}/all-hypervisor-bypassed-repacks-a-z/?lcp_page0=${page_number}#lcp_instance_0`,
+      "Hypervisor Bypass": `${BASE_URL}/all-hypervisor-bypassed-repacks-a-z/`,
       "Switch Emulated": `${BASE_URL}/all-switch-emulated-repacks-a-z/?lcp_page0=${page_number}#lcp_instance_0`,
-      "PS3 Emulated": `${BASE_URL}/all-playstation-3-emulated-repacks-a-z/?lcp_page0=${page_number}#lcp_instance_0`,
+      "PS3 Emulated": `${BASE_URL}/all-playstation-3-emulated-repacks-a-z/`,
       "All Repacks": `${BASE_URL}/all-my-repacks-a-z/?lcp_page0=${page_number}#lcp_instance_0`,
     };
 
